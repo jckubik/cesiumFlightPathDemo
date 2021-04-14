@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+    <!-- Include the CesiumJS JavaScript and CSS files -->
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.79.1/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.79.1/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  <div id="toolbar"></div>
+  <script>
+    // Get your token from https://cesium.com/ion/tokens
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5Y2Y2NGI1Ny1iOWMwLTQ0MGItYmVlMi04ZDA4MzUzYWM0NDYiLCJpZCI6NDY2NjUsImlhdCI6MTYxNjQzODk2M30.yk9DAjeTwE53CYraBHz2FNJYCfFMQ2iE83VuPmAEGpo';
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      shouldAnimate: true,
+      vrButton: true,
+      shadows: true,
+      terrainProvider: Cesium.createWorldTerrain()
+    });
+
+    // Add OSM Buildings
+    let osmBuildings = viewer.scene.primitives.add(Cesium.createOsmBuildings());
+
+    // These are all the radar points from this flight
+    const flightData = JSON.parse(
+      '[{"longitude":-122.35875,"latitude":37.61144,"height":-27.26},{"longitude":-122.35865,"latitude":37.61171,"height":-27.26},{"longitude":-122.35889,"latitude":37.612,"height":-27.26},{"longitude":-122.35923,"latitude":37.61211,"height":-27.26},{"longitude":-122.35954,"latitude":37.61222,"height":-27.26},{"longitude":-122.36029,"latitude":37.61253,"height":-27.27},{"longitude":-122.36184,"latitude":37.61317,"height":-27.27},{"longitude":-122.36823,"latitude":37.61588,"height":-27.28},{"longitude":-122.37163,"latitude":37.61728,"height":-27.28},{"longitude":-122.38041,"latitude":37.62096,"height":-27.3},{"longitude":-122.38548,"latitude":37.6231,"height":-27.31},{"longitude":-122.3905,"latitude":37.6252,"height":10.79},{"longitude":-122.39517,"latitude":37.62721,"height":56.5},{"longitude":-122.40037,"latitude":37.62955,"height":125.07},{"longitude":-122.40507,"latitude":37.63171,"height":186.03},{"longitude":-122.41457,"latitude":37.63623,"height":292.69},{"longitude":-122.42428,"latitude":37.64062,"height":384.12},{"longitude":-122.42896,"latitude":37.64261,"height":429.83},{"longitude":-122.43398,"latitude":37.6447,"height":483.17},{"longitude":-122.44357,"latitude":37.64859,"height":582.21},{"longitude":-122.45319,"latitude":37.65243,"height":643.16},{"longitude":-122.4639,"latitude":37.65678,"height":719.35},{"longitude":-122.47395,"latitude":37.66081,"height":803.15},{"longitude":-122.47922,"latitude":37.66286,"height":841.25},{"longitude":-122.48441,"latitude":37.66489,"height":879.34},{"longitude":-122.49505,"latitude":37.66933,"height":970.77},{"longitude":-122.5003,"latitude":37.67162,"height":993.62},{"longitude":-122.51083,"latitude":37.67647,"height":1024.08},{"longitude":-122.51626,"latitude":37.67999,"height":1039.31},{"longitude":-122.52048,"latitude":37.68431,"height":1046.93},{"longitude":-122.52323,"latitude":37.68939,"height":1069.79},{"longitude":-122.52456,"latitude":37.69482,"height":1092.65},{"longitude":-122.5255,"latitude":37.70298,"height":1115.52},{"longitude":-122.52602,"latitude":37.70943,"height":1138.38},{"longitude":-122.52634,"latitude":37.71574,"height":1161.25},{"longitude":-122.51643,"latitude":37.73744,"height":1245.12},{"longitude":-122.50723,"latitude":37.74465,"height":1283.25},{"longitude":-122.50024,"latitude":37.74957,"height":1313.75},{"longitude":-122.4864,"latitude":37.75959,"height":1397.6},{"longitude":-122.47231,"latitude":37.77008,"height":1504.31},{"longitude":-122.45805,"latitude":37.78079,"height":1626.25},{"longitude":-122.44339,"latitude":37.79173,"height":1755.82},{"longitude":-122.42878,"latitude":37.80263,"height":1893.01},{"longitude":-122.41031,"latitude":37.81632,"height":2045.44},{"longitude":-122.39535,"latitude":37.82744,"height":2175},{"longitude":-122.3808,"latitude":37.8382,"height":2304.56},{"longitude":-122.36244,"latitude":37.85177,"height":2472.23},{"longitude":-122.34698,"latitude":37.86317,"height":2601.79},{"longitude":-122.33206,"latitude":37.87422,"height":2716.11},{"longitude":-122.31736,"latitude":37.88505,"height":2830.42},{"longitude":-122.29758,"latitude":37.89967,"height":2982.85},{"longitude":-122.28344,"latitude":37.91011,"height":3089.54},{"longitude":-122.2672,"latitude":37.9221,"height":3142.9},{"longitude":-122.25107,"latitude":37.93401,"height":3196.25},{"longitude":-122.235,"latitude":37.94586,"height":3241.98}]'
+    );
+
+    /* Initialize the viewer clock:
+  Assume the radar samples are 30 seconds apart, and calculate the entire flight duration based on that assumption.
+  Get the start and stop date times of the flight, where the start is the known flight departure time (converted from PST
+    to UTC) and the stop is the start plus the calculated duration. (Note that Cesium uses Julian dates. See
+    https://simple.wikipedia.org/wiki/Julian_day.)
+  Initialize the viewer's clock by setting its start and stop to the flight start and stop times we just calculated.
+  Also, set the viewer's current time to the start time and take the user to that time.
+*/
+
+    const timeStepInSeconds = 30;
+    const totalSeconds = timeStepInSeconds * (flightData.length - 1);
+    const start = Cesium.JulianDate.fromIso8601("2020-03-09T23:10:00Z");
+    const stop = Cesium.JulianDate.addSeconds(start, totalSeconds, new Cesium.JulianDate());
+    viewer.clock.startTime = start.clone();
+    viewer.clock.stopTime = stop.clone();
+    viewer.clock.currentTime = start.clone();
+    viewer.timeline.zoomTo(start, stop);
+    // Speed up the playback speed 70x
+    viewer.clock.multiplier = 70;
+    // Start playing the scene
+    viewer.clock.shouldAnimate = true;
+
+    // The SampledPositionedProperty stores the position and timestamp for each sample along the radar sample series.
+    const positionProperty = new Cesium.SampledPositionProperty();
+
+    // Create a point for each
+    for (let i = 0; i < flightData.length; i++) {
+      const dataPoint = flightData[i];
+      // Declare a time for this individual sample and store it in a new JulianDate instance
+      const time = Cesium.JulianDate.addSeconds(start, i * timeStepInSeconds, new Cesium.JulianDate());
+      const position = Cesium.Cartesian3.fromDegrees(dataPoint.longitude, dataPoint.latitude, dataPoint.height);
+      // Store the position along with its timestamp
+      positionProperty.addSample(time, position);
+
+
+      viewer.entities.add({
+        description: `Location: ${dataPoint.longitude}, ${dataPoint.latitude}, ${dataPoint.height}`,
+        position: Cesium.Cartesian3.fromDegrees(dataPoint.longitude, dataPoint.latitude, dataPoint.height),
+        // point: { pixelSize: 10, color: Cesium.Color.RED},
+      });
+    };
+
+    async function loadModel() {
+      // Load the glTF model from Cesium Ion
+      const airplaneUri = await Cesium.IonResource.fromAssetId(387751);
+      const airplaneEntity = viewer.entities.add({
+        availability: new Cesium.TimeIntervalCollection([ new Cesium.TimeInterval({ start: start, stop: stop }) ]),
+        position: positionProperty,
+        // Attach the 3D model
+        model: { uri: airplaneUri },
+        // Automatically compute the orientation from the position
+        orientation: new Cesium.VelocityOrientationProperty(positionProperty),
+        path: new Cesium.PathGraphics({ width: 3, show: false }),
+      });
+      // Set camera to track the airplane
+      viewer.trackedEntity = airplaneEntity;
+    }
+
+    loadModel();
+
+
+    // Create polygon cloud data
+
+    let cloudColor = [255, 255, 255, 120];
+
+    // Points for cloud1
+    let czmlCloudPoints1 = [
+      -122.45319, 37.65243, 643.16,
+      -122.4639, 37.65678, 719.35,
+     -122.52456, 37.69482, 1092.65,
+     -122.51643, 37.73744, 1245.12,
+        ];
+
+    // Points for cloud2
+    let czmlCloudPoints2 = [
+      -122.40128, 37.65443, 500.16,
+      -122.3639, 37.65178, 719.35,
+     -122.36456, 37.69382, 1092.65,
+     -122.34643, 37.73544, 1245.12,
+        ];
+
+
+    // The actual CZML object
+    let czmlClouds = [
+      {
+        id: "document",
+        name: "CZML Geometries: Polygon",
+        version: "1.0",
+      },
+      {
+        id: "cloud1",
+        name: "cloud1",
+        polygon: {
+          positions: {
+            cartographicDegrees: [...czmlCloudPoints1],
+          },
+          material: {
+            solidColor: {
+              color: {
+                rgba: cloudColor,
+              },
+            },
+          },
+          extrudedHeight: 600,
+          perPositionHeight: true,
+        },
+      },
+      {
+        id: "cloud2",
+        name: "cloud2",
+        polygon: {
+          positions: {
+            cartographicDegrees: [...czmlCloudPoints2],
+          },
+          material: {
+            solidColor: {
+              color: {
+                rgba: cloudColor,
+              },
+            },
+          },
+          extrudedHeight: 600,
+          perPositionHeight: true,
+        },
+      },
+    ];
+
+    // Add the CZML polygons to the scene
+    let dataSourcePromise = Cesium.CzmlDataSource.load(czmlClouds);
+    viewer.dataSources.add(dataSourcePromise);
+
+
+
+    // Implementing Weather with the particle system
+    // let scene = viewer.scene;
+    // scene.globe.depthTestAgainstTerrain = true;
+
+    // // Snow
+    // let snowParticleSize = 12.0;
+    // let snowRadius = 100000.0;
+    // let minimumSnowImageSize = new Cesium.Cartesian2(
+    //   snowParticleSize,
+    //   snowParticleSize
+    // );
+
+    // let maximumSnowImageSize = new Cesium.Cartesian2(
+    //   snowParticleSize * 2,
+    //   snowParticleSize * 2
+    // );
+
+
+    // let snowSystem;
+    // let snowGravityScratch = Cesium.Cartesian3();
+    // let snowUpdate = function (particle, dt) {
+    //   snowGravityScratch = Cesium.Cartesian3.normalize(
+    //     particle.position,
+    //     snowGravityScratch
+    //   );
+    //   Cesium.Cartesian3.multiplyByScalar(
+    //     snowGravityScratch,
+    //     Cesium.Math.RandomBetween(-30.0, -300.0),
+    //     snowGravityScratch
+    //   );
+    //   particle.velocity = Cesium.Cartesian3.add(
+    //     particle.velocity,
+    //     snowGravityScratch,
+    //     particle.velocity
+    //   );
+
+    //   let distance = Cesium.Cartesian3.distance(
+    //     scene.camera.position,
+    //     particle.position
+    //   );
+    //   if (distance > snowRadius) {
+    //     particle.endColor.alpha = 0.0;
+    //   } else {
+    //     particle.endColor.alpha = snowsystem.endColor.alpha / (distance / snowRadius + 0.1);
+    //   }
+    // };
+
+    // snowSystem = new Cesium.ParticleSystem({
+    //   modelMatrix: new Cesiusm.Matrix4.fromTranslation(scene.camera.position),
+    //   minimumSpeed: -1.0,
+    //   maximumSpeed: 0.0,
+    //   lifeTime: 15.0,
+    //   emitter: new Cesium.SphereEmitter(snowRadius),
+    //   startScale: 0.5,
+    //   endScale: 1.0,
+    //   image: "../SampleData/snowflake_particle.png",
+    //   emissionRate: 7000.0,
+    //   startColor: Cesium.Color.WHITE.withAlpha(0.0),
+    //   endColor: Cesium.Color.WHITE.withAlpha(1.0),
+    //   minimumImageSize: minimumSnowImageSize,
+    //   maximumImageSize: maximumSnowImageSize,
+    //   updateCallback: snowUpdate,
+    // });
+    // scene.primitives.add(snowSystem);
+
+
+  </script>
+ </div>
+</body>
+</html>
